@@ -1,4 +1,4 @@
-package com.evf.eventvaultfinance;
+package com.ev.finance;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
