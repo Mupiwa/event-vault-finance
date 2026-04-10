@@ -129,3 +129,86 @@ git remote set-url origin git@github.com:Mupiwa/event-vault-finance.git
 - Mobile app
 - Fraud detection layer
 - Cross-user programmable contracts
+
+---
+
+## 🚢 Deployment
+
+The application is deployed to **AWS ECS Fargate** using CloudFormation for infrastructure-as-code. The stack provisions a VPC, ALB, ECR repository, ECS cluster, and Fargate service.
+
+### Prerequisites
+
+- **AWS CLI** installed and configured with appropriate credentials (`aws configure`)
+- **Docker** installed and running locally
+- **Java 17+** and **Gradle** (or use the included Gradle Wrapper)
+- AWS account with permissions to create VPC, ECS, ECR, ALB, IAM, and CloudWatch resources
+
+### Architecture Overview
+
+```
+Internet → ALB (port 80) → ECS Fargate Service (port 8080) → Spring Boot App
+                                      ↑
+                              ECR (Docker image)
+```
+
+**Resources provisioned by CloudFormation:**
+- VPC with 2 public subnets across 2 Availability Zones
+- Internet Gateway with route tables
+- Application Load Balancer (internet-facing) on port 80
+- ECS Cluster with Fargate launch type
+- ECR repository for Docker images
+- CloudWatch Log Group for container logs
+- Security groups (ALB: 80/443 inbound; ECS: 8080 from ALB only)
+- IAM roles (Task Execution Role + Task Role)
+
+### Deploy
+
+Run the deployment script from the project root:
+
+```bash
+./deploy/deploy.sh
+```
+
+The script will:
+1. Build the Spring Boot JAR (`./gradlew clean bootJar`)
+2. Deploy/update the CloudFormation stack
+3. Build and push the Docker image to ECR
+4. Force a new ECS deployment to pick up the latest image
+5. Print the ALB URL where the app is accessible
+
+#### Environment Variable Overrides
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AWS_REGION` | `us-east-1` | AWS region for deployment |
+| `ECR_REPO_NAME` | `event-vault-finance` | ECR repository name |
+| `STACK_NAME` | `event-vault-finance-stack` | CloudFormation stack name |
+
+Example with overrides:
+
+```bash
+AWS_REGION=eu-west-1 ./deploy/deploy.sh
+```
+
+### Health Check
+
+The ALB target group performs health checks against:
+
+```
+GET /actuator/health (port 8080)
+```
+
+### Tear Down
+
+To delete all AWS resources created by the stack:
+
+```bash
+aws cloudformation delete-stack --stack-name event-vault-finance-stack --region us-east-1
+```
+
+> **Note:** You must manually delete any images in the ECR repository before the stack can be fully deleted, or empty the repository first:
+> ```bash
+> aws ecr batch-delete-image --repository-name event-vault-finance \
+>   --image-ids "$(aws ecr list-images --repository-name event-vault-finance --query 'imageIds[*]' --output json)" \
+>   --region us-east-1
+> ```

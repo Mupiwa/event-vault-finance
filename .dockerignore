@@ -1,0 +1,9 @@
+.gradle
+.git
+build/classes
+build/tmp
+src/test
+.idea
+*.iml
+.env
+deploy
